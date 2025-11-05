@@ -1,6 +1,6 @@
 from typing import Optional
 from re import fullmatch
- 
+from abc import ABC, abstractmethod
  
 class Product:
     # FIXME: klasa powinna posiadać metodę inicjalizacyjną przyjmującą argumenty wyrażające nazwę produktu (typu str) i jego cenę (typu float) -- w takiej kolejności -- i ustawiającą atrybuty `name` (typu str) oraz `price` (typu float)
@@ -28,8 +28,16 @@ class TooManyProductsFoundError:
 #   (1) metodę inicjalizacyjną przyjmującą listę obiektów typu `Product` i ustawiającą atrybut `products` zgodnie z typem reprezentacji produktów na danym serwerze,
 #   (2) możliwość odwołania się do atrybutu klasowego `n_max_returned_entries` (typu int) wyrażający maksymalną dopuszczalną liczbę wyników wyszukiwania,
 #   (3) możliwość odwołania się do metody `get_entries(self, n_letters)` zwracającą listę produktów spełniających kryterium wyszukiwania
- 
-class ListServer:
+
+
+class Server(ABC):
+
+    @abstractmethod
+    def get_entries(self, n_letters):
+        pass
+
+
+class ListServer(Server):
     def __init__(self, products: list[Product]):
         if not isinstance(products, list) and all(isinstance(p, Product) for p in products):
             raise ValueError("Products powinny być listą obiektów typu Product")
@@ -49,7 +57,7 @@ class ListServer:
         return list.sort(wyszukane, key=lambda p: p.price)
     
 
-class MapServer:
+class MapServer(Server):
     def __init__(self, products: list[Product]):
         if not isinstance(products, list) and all(isinstance(p, Product) for p in products):
             raise ValueError("Products powinny być listą obiektów typu Product")
@@ -58,12 +66,12 @@ class MapServer:
     n_max_returned_entries = 3
 
     def get_entries(self, n_letters: int = 1) -> list[Product]:
-        wyszukane = {}
+        wyszukane = []
         for product in self.products.values():
             letter_count = sum(c.isalpha() for c in product.name)
             number_count = sum(c.isdigit() for c in product.name)
             if letter_count == n_letters and (number_count == 2 or number_count == 3):        
-                wyszukane[product.name] = product
+                wyszukane.append(product)
             if len(wyszukane) > self.n_max_returned_entries:
                 raise TooManyProductsFoundError()
         return list.sort(wyszukane, key=lambda p: p.price)
@@ -71,7 +79,15 @@ class MapServer:
  
 class Client:
     # FIXME: klasa powinna posiadać metodę inicjalizacyjną przyjmującą obiekt reprezentujący serwer
-
+    def __init__(self, server):
+        if not isinstance(server, Server):
+            raise ValueError('Argumentem powinien być serwer')
+        self.server = server
  
     def get_total_price(self, n_letters: Optional[int]) -> Optional[float]:
-        raise NotImplementedError()
+        try: 
+            a = self.server.get_entries(n_letters)
+        except TooManyProductsFoundError:
+            return None
+        Wyszukane = self.server.get_entries(n_letters)
+        return sum(p.price for p in Wyszukane)
