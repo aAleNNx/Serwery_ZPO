@@ -7,19 +7,21 @@ class Product:
     def __init__(self, name: str, price: float):
         if not isinstance(name, str) or not bool(fullmatch(r'[A-Za-z]+[0-9]+', name)):
             raise ValueError("Nazwa produktu jest niepoprawna")
-        if not isinstance(price, float) or price <= 0:
+        if not isinstance(price, (int, float)) or price < 0:
             raise ValueError("Cena produktu jest niepoprawna")
         self.name = name
         self.price = price
 
     def __eq__(self, other):
+        if not isinstance(other, Product):
+            return False
         return self.name == other.name and self.price == other.price
  
     def __hash__(self):
         return hash((self.name, self.price))
  
  
-class TooManyProductsFoundError:
+class TooManyProductsFoundError(Exception):
     # Reprezentuje wyjątek związany ze znalezieniem zbyt dużej liczby produktów.
     pass
  
@@ -31,19 +33,21 @@ class TooManyProductsFoundError:
 
 
 class Server(ABC):
-
+    n_max_returned_entries = 3
     @abstractmethod
     def get_entries(self, n_letters):
         pass
 
 
 class ListServer(Server):
-    def __init__(self, products: list[Product]):
-        if not isinstance(products, list) and all(isinstance(p, Product) for p in products):
+    def __init__(self, products: list[Product], n_max_returned_entries_ = 3):
+        if not isinstance(products, list) or all(isinstance(p, Product) for p in products):
             raise ValueError("Products powinny być listą obiektów typu Product")
+        if n_max_returned_entries_ not in range(3,8):
+            raise ValueError("max_returned musi być z przedzialu 3 - 7")
+        
         self.products = products
-
-    n_max_returned_entries = 3
+        self.n_max_returned_entries = n_max_returned_entries_
     
     def get_entries(self, n_letters: int = 1) -> list[Product]:
         wyszukane = []
@@ -54,16 +58,18 @@ class ListServer(Server):
                 wyszukane.append(product)
             if len(wyszukane) > self.n_max_returned_entries:
                 raise TooManyProductsFoundError()
-        return list.sort(wyszukane, key=lambda p: p.price)
+        return sorted(wyszukane, key=lambda p: p.price)
     
 
 class MapServer(Server):
-    def __init__(self, products: list[Product]):
-        if not isinstance(products, list) and all(isinstance(p, Product) for p in products):
+    def __init__(self, products: list[Product], n_max_returned_entries_ = 3):
+        if not isinstance(products, list) or all(isinstance(p, Product) for p in products):
             raise ValueError("Products powinny być listą obiektów typu Product")
+        if n_max_returned_entries_ not in range(3,8):
+            raise ValueError("max_returned musi być z przedzialu 3 - 7")
+        
         self.products = {product.name: product for product in products}
-
-    n_max_returned_entries = 3
+        self.n_max_returned_entries = n_max_returned_entries_
 
     def get_entries(self, n_letters: int = 1) -> list[Product]:
         wyszukane = []
@@ -74,7 +80,7 @@ class MapServer(Server):
                 wyszukane.append(product)
             if len(wyszukane) > self.n_max_returned_entries:
                 raise TooManyProductsFoundError()
-        return list.sort(wyszukane, key=lambda p: p.price)
+        return sorted(wyszukane, key=lambda p: p.price)
  
  
 class Client:
@@ -86,8 +92,10 @@ class Client:
  
     def get_total_price(self, n_letters: Optional[int]) -> Optional[float]:
         try: 
-            a = self.server.get_entries(n_letters)
+            wyszukane = self.server.get_entries(n_letters)
         except TooManyProductsFoundError:
             return None
-        Wyszukane = self.server.get_entries(n_letters)
-        return sum(p.price for p in Wyszukane)
+        if not wyszukane:
+            return None
+        Total_price = sum(p.price for p in wyszukane)
+        return Total_price
